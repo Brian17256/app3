@@ -70,6 +70,38 @@ header {
     display: flex;
     align-items: center;
     gap: 8px;
+    position: relative;
+}
+
+#color-palette {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+#color-palette.hidden {
+    display: none;
+}
+
+.color-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.color-dot:active {
+    border-color: #fff;
 }
 
 h1#app-title {
@@ -140,27 +172,7 @@ h1#app-title {
     border-bottom: 2px solid var(--text-color);
 }
 
-/* Controls */
-#controls-bar {
-    padding: 10px 15px;
-    display: flex;
-    justify-content: center;
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-}
 
-.zoom-control {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--text-muted);
-    font-weight: 600;
-}
-
-input[type="range"] {
-    accent-color: var(--text-color);
-    width: 120px;
-}
 
 /* Main Content */
 main {
@@ -200,6 +212,17 @@ main {
 .cols-9 { grid-template-columns: repeat(9, 1fr); }
 .cols-10 { grid-template-columns: repeat(10, 1fr); }
 
+/* Auto-scale text based on columns */
+.cols-2 .note-title { font-size: 1.2rem; }
+.cols-3 .note-title { font-size: 1rem; }
+.cols-4 .note-title { font-size: 0.9rem; }
+.cols-5 .note-title { font-size: 0.8rem; }
+.cols-6 .note-title { font-size: 0.7rem; }
+.cols-7 .note-title { font-size: 0.65rem; }
+.cols-8 .note-title { font-size: 0.6rem; }
+.cols-9 .note-title { font-size: 0.55rem; }
+.cols-10 .note-title { font-size: 0.5rem; }
+
 .note-square {
     aspect-ratio: 1 / 1;
     display: flex;
@@ -230,11 +253,14 @@ main {
     text-shadow: 0 1px 3px rgba(0,0,0,0.6);
     font-weight: 800;
     text-align: center;
-    word-break: break-word;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
     display: -webkit-box;
     -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    width: 100%;
 }
 
 /* Editor */
@@ -262,19 +288,6 @@ main {
     outline: none;
 }
 
-#note-folder-select {
-    background: var(--tab-bg);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-    padding: 5px;
-    border-radius: 4px;
-    margin-right: 10px;
-    outline: none;
-}
-
-#note-folder-select:focus {
-    border-color: var(--text-color);
-}
 
 #note-editor {
     flex-grow: 1;
@@ -293,7 +306,8 @@ main {
 }
 
 /* Markdown Styles inside Editor */
-#note-editor h1, #note-editor h2, #note-editor h3 {
+#note-editor h1, #note-editor h2, #note-editor h3,
+#note-editor h4, #note-editor h5, #note-editor h6 {
     margin-top: 1em;
     margin-bottom: 0.5em;
     font-weight: 800;
@@ -302,6 +316,26 @@ main {
 #note-editor ul, #note-editor ol {
     margin-left: 20px;
     margin-bottom: 1em;
+}
+
+#note-editor li {
+    margin-bottom: 0.25em;
+}
+
+#note-editor blockquote {
+    border-left: 4px solid var(--text-muted);
+    padding-left: 15px;
+    color: var(--text-muted);
+    margin: 1em 0;
+    font-style: italic;
+}
+
+#note-editor b {
+    font-weight: 800;
+}
+
+#note-editor i {
+    font-style: italic;
 }
 
 #note-editor .note-link {
@@ -313,33 +347,58 @@ main {
 
 /* Images in Editor */
 #note-editor .resizable-image-wrapper {
-    display: inline-block;
+    display: block;
     position: relative;
     max-width: 100%;
-    margin: 10px 0;
+    margin: 10px auto;
+    width: 80%;
+    transition: float 0.3s;
+}
+
+#note-editor .resizable-image-wrapper.img-float-left {
+    float: left;
+    margin: 10px 15px 10px 0;
+    width: 40%;
+    clear: both;
+}
+
+#note-editor .resizable-image-wrapper.img-float-right {
+    float: right;
+    margin: 10px 0 10px 15px;
+    width: 40%;
+    clear: both;
 }
 
 #note-editor img {
-    max-width: 100%;
-    display: block;
+    width: 100%;
     height: auto;
+    display: block;
+    border-radius: 4px;
+    cursor: pointer;
 }
 
 .resize-handle {
     position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 20px;
-    height: 20px;
-    background: var(--text-color);
-    clip-path: polygon(100% 0, 100% 100%, 0 100%);
-    cursor: se-resize;
-    opacity: 0;
-    transition: opacity 0.2s;
+    bottom: -15px;
+    right: -15px;
+    width: 40px;
+    height: 40px;
+    background: var(--bg-color);
+    border-radius: 50%;
+    cursor: nwse-resize;
+    opacity: 0.9;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 3px solid var(--text-color);
 }
 
-.resizable-image-wrapper:hover .resize-handle {
-    opacity: 1;
+.resize-handle::after {
+    content: "⤡";
+    color: var(--text-color);
+    font-size: 20px;
+    font-weight: bold;
 }
 
 /* Settings View */
@@ -371,7 +430,6 @@ main {
 /* Folders */
 .folder-square {
     border: 2px solid var(--text-muted);
-    background: transparent !important;
 }
 
 .folder-square::before {

@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const editorView = document.getElementById('editor-view');
     const settingsView = document.getElementById('settings-view');
     const notesGrid = document.getElementById('notes-grid');
-    const controlsBar = document.getElementById('controls-bar');
     const tabsBar = document.getElementById('tabs-bar');
     const tabsContainer = document.querySelector('.tabs-container');
     const btnBack = document.getElementById('btn-back');
@@ -17,10 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const zoomSlider = document.getElementById('zoom-slider');
     const fontSizeSlider = document.getElementById('font-size-slider');
     const fontSizeVal = document.getElementById('font-size-val');
+    const colorPalette = document.getElementById('color-palette');
+    const btnColor = document.getElementById('btn-color');
     
     // Editor Elements
     const noteTitleInput = document.getElementById('note-title-input');
-    const noteFolderSelect = document.getElementById('note-folder-select');
     const noteEditor = document.getElementById('note-editor');
     const btnAddImage = document.getElementById('btn-add-image');
     const imageUpload = document.getElementById('image-upload');
@@ -62,17 +62,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentView === 'grid') {
             btnBack.classList.toggle('hidden', currentFolderId === null);
             appTitle.textContent = currentFolderId ? store.data.folders[currentFolderId].name : 'Notas';
-            controlsBar.classList.remove('hidden');
             tabsBar.classList.add('hidden');
+            btnAddNote.classList.remove('hidden');
+            btnFolders.classList.toggle('hidden', currentFolderId !== null);
+            btnColor.classList.toggle('hidden', currentFolderId === null);
         } else if (currentView === 'editor') {
             btnBack.classList.remove('hidden');
-            controlsBar.classList.add('hidden');
-            // Title is dynamically set in renderEditor
+            appTitle.textContent = ''; // Removed redundant title
+            btnAddNote.classList.add('hidden');
+            btnFolders.classList.add('hidden');
+            btnColor.classList.remove('hidden');
         } else {
             btnBack.classList.remove('hidden');
             appTitle.textContent = 'Ajustes';
-            controlsBar.classList.add('hidden');
             tabsBar.classList.add('hidden');
+            btnAddNote.classList.add('hidden');
+            btnFolders.classList.add('hidden');
+            btnColor.classList.add('hidden');
         }
     }
 
@@ -103,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // go back from folder grid to root grid
             currentFolderId = null;
             renderGrid();
+            updateHeader();
         }
     }
 
@@ -117,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         itemsToRender.forEach(item => {
             const square = document.createElement('div');
             square.className = 'note-square' + (item.type === 'folder' ? ' folder-square' : '');
-            square.style.backgroundColor = item.type === 'note' ? item.color : '';
+            square.style.backgroundColor = item.color;
             square.dataset.id = item.id;
             square.draggable = true;
             
@@ -147,18 +154,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!note) return;
 
         noteTitleInput.value = note.title;
-        appTitle.textContent = note.title;
-        
-        // Populate folder select
-        noteFolderSelect.innerHTML = '<option value="">(Sin carpeta)</option>';
-        store.getFolders().forEach(f => {
-            const opt = document.createElement('option');
-            opt.value = f.id;
-            opt.textContent = f.name;
-            noteFolderSelect.appendChild(opt);
-        });
-        noteFolderSelect.value = note.folderId || '';
-        noteFolderSelect.classList.remove('hidden');
+        appTitle.textContent = ''; // Clear redundant title
         
         // Parse custom Markdown-like links to clickable elements
         noteEditor.innerHTML = parseMarkdownToHTML(note.content);
@@ -173,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const title = noteTitleInput.value.trim() || 'Sin Título';
         const content = parseHTMLToMarkdown(noteEditor.innerHTML);
-        const folderId = noteFolderSelect.value || null;
+        const folderId = store.data.notes[currentNoteId].folderId; // preserve folderId
         
         store.updateNote(currentNoteId, title, content, folderId);
         
@@ -200,14 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         tabsBar.classList.remove('hidden');
-        
-        // Create tab for parent note (Active)
-        const parentTab = document.createElement('div');
-        parentTab.className = 'tab active';
-        parentTab.textContent = parentNote.title;
-        tabsContainer.appendChild(parentTab);
 
-        // Create tabs for sub-notes
+        // Create tabs for sub-notes ONLY
         linkTitles.forEach(title => {
             const tab = document.createElement('div');
             tab.className = 'tab';
@@ -268,6 +258,118 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // --- Live Markdown & Auto-close ---
+    noteEditor.addEventListener('keydown', (e) => {
+        // Auto-close pairs
+        const pairs = { '"': '"', "'": "'", "(": ")", "[": "]", "{": "}" };
+        if (pairs[e.key]) {
+            e.preventDefault();
+            document.execCommand('insertText', false, e.key + pairs[e.key]);
+            const sel = window.getSelection();
+            sel.modify('move', 'backward', 'character');
+        }
+
+        // Live markdown parsing for headings on Enter/Space
+        if (e.key === ' ' || e.key === 'Enter') {
+            const sel = window.getSelection();
+            if (!sel.isCollapsed) return;
+            const node = sel.anchorNode;
+            if (node.nodeType === Node.TEXT_NODE) {
+                const text = node.textContent;
+                const match = text.match(/^(#{1,6})\s(.*)$/);
+                if (match && e.key === 'Enter') {
+                    // It's a heading
+                } else if (text.match(/^(#{1,6})$/) && e.key === ' ') {
+                    e.preventDefault();
+                    const level = text.length;
+                    const h = document.createElement('h' + level);
+                    h.innerHTML = '<br>';
+                    node.parentNode.replaceChild(h, node);
+                    sel.collapse(h, 0);
+                } else if ((text === '-' || text === '*') && e.key === ' ') {
+                    e.preventDefault();
+                    const ul = document.createElement('ul');
+                    const li = document.createElement('li');
+                    li.innerHTML = '<br>';
+                    ul.appendChild(li);
+                    node.parentNode.replaceChild(ul, node);
+                    sel.collapse(li, 0);
+                } else if (text.match(/^\d+[\.\)]$/) && e.key === ' ') {
+                    e.preventDefault();
+                    const ol = document.createElement('ol');
+                    const li = document.createElement('li');
+                    li.innerHTML = '<br>';
+                    ol.appendChild(li);
+                    node.parentNode.replaceChild(ol, node);
+                    sel.collapse(li, 0);
+                } else if (text === '>' && e.key === ' ') {
+                    e.preventDefault();
+                    const bq = document.createElement('blockquote');
+                    bq.innerHTML = '<br>';
+                    node.parentNode.replaceChild(bq, node);
+                    sel.collapse(bq, 0);
+                }
+            }
+        }
+    });
+
+    function replaceMatchWithNode(textNode, match, nodeToInsert) {
+        const text = textNode.textContent;
+        const beforeText = text.substring(0, match.index);
+        const afterText = text.substring(match.index + match[0].length);
+        
+        const parent = textNode.parentNode;
+        const beforeNode = document.createTextNode(beforeText);
+        const afterNode = document.createTextNode(afterText);
+        
+        parent.insertBefore(beforeNode, textNode);
+        parent.insertBefore(nodeToInsert, textNode);
+        parent.insertBefore(afterNode, textNode);
+        parent.removeChild(textNode);
+        
+        window.getSelection().collapse(afterNode, 0);
+    }
+
+    // Parse links, bold, italics dynamically on input
+    noteEditor.addEventListener('input', (e) => {
+        const sel = window.getSelection();
+        if (!sel.anchorNode || sel.anchorNode.nodeType !== Node.TEXT_NODE) return;
+        
+        const node = sel.anchorNode;
+        const text = node.textContent;
+        
+        // Links
+        let match = /\[\[(.*?)\]\]/.exec(text);
+        if (match) {
+            const title = match[1];
+            const span = document.createElement('span');
+            span.className = 'note-link';
+            span.setAttribute('data-title', title);
+            span.contentEditable = "false";
+            span.textContent = `[[${title}]]`;
+            replaceMatchWithNode(node, match, span);
+            return;
+        }
+
+        // Bold **text**
+        match = /\*\*(.+?)\*\*/.exec(text);
+        if (match) {
+            const b = document.createElement('b');
+            b.textContent = match[1];
+            replaceMatchWithNode(node, match, b);
+            return;
+        }
+
+        // Italic _text_
+        match = /_(.+?)_/.exec(text);
+        if (match) {
+            const i = document.createElement('i');
+            i.textContent = match[1];
+            replaceMatchWithNode(node, match, i);
+            return;
+        }
+    });
+
     // --- Settings & UI Logic ---
 
     function applySettings() {
@@ -321,9 +423,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    noteFolderSelect.addEventListener('change', () => {
-        saveCurrentNote();
+    btnColor.addEventListener('click', () => {
+        colorPalette.classList.toggle('hidden');
     });
+
+    document.querySelectorAll('.color-dot').forEach(dot => {
+        dot.addEventListener('click', (e) => {
+            const color = e.target.getAttribute('data-color');
+            if (currentView === 'editor' && pathHistory.length > 0) {
+                const noteId = pathHistory[pathHistory.length - 1];
+                store.data.notes[noteId].color = color;
+                store.saveData();
+            } else if (currentView === 'grid' && currentFolderId !== null) {
+                store.data.folders[currentFolderId].color = color;
+                store.saveData();
+                renderGrid(); // Refresh to show colored folder in header or inside if needed
+            }
+            colorPalette.classList.add('hidden');
+        });
+    });
+
+    // Hide palette when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!btnColor.contains(e.target) && !colorPalette.contains(e.target)) {
+            colorPalette.classList.add('hidden');
+        }
+    });
+
+
 
     // --- Image Handling ---
 
@@ -372,6 +499,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         setupImageResize(wrapper, img, handle);
+        
+        // Cycle float left -> right -> none when clicking image
+        img.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (wrapper.classList.contains('img-float-left')) {
+                wrapper.classList.remove('img-float-left');
+                wrapper.classList.add('img-float-right');
+            } else if (wrapper.classList.contains('img-float-right')) {
+                wrapper.classList.remove('img-float-right');
+            } else {
+                wrapper.classList.add('img-float-left');
+            }
+            saveCurrentNote();
+        });
     }
 
     function setupImageResize(wrapper, img, handle) {

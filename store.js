@@ -45,7 +45,7 @@ class Store {
         return {
             theme: 'dark',
             fontSize: 16,
-            zoom: 3
+            zoom: 4
         };
     }
 
@@ -125,7 +125,7 @@ class Store {
     // --- Folders ---
     createFolder(name) {
         const id = 'folder_' + Math.random().toString(36).substr(2, 9);
-        const folder = { id, name };
+        const folder = { id, name, color: getRandomColor() };
         this.data.folders[id] = folder;
         this.data.rootOrder.push(id);
         this.saveData();
