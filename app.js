@@ -338,8 +338,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const node = sel.anchorNode;
         const text = node.textContent;
         
+        // Headers dynamically on input
+        let match = /^(#{1,6})\s+(.+)$/.exec(text);
+        if (!match) match = /^(#{1,6})\s*(.+?)\s*\1$/.exec(text); // Also support ## Title ##
+        
+        if (match && (node.parentNode.tagName === 'DIV' || node.parentNode.id === 'note-editor')) {
+            const level = match[1].length;
+            const h = document.createElement('h' + level);
+            h.textContent = match[2];
+            node.parentNode.replaceChild(h, node);
+            if (h.firstChild) {
+                sel.collapse(h.firstChild, h.firstChild.length);
+            }
+            return;
+        }
+        
         // Links
-        let match = /\[\[(.*?)\]\]/.exec(text);
+        match = /\[\[(.*?)\]\]/.exec(text);
         if (match) {
             const title = match[1];
             const span = document.createElement('span');
